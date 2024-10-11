@@ -4,13 +4,10 @@
 
 {% block content %}
 <h2>Login</h2>
-<form action="/login" method="post">
-    <label for="username">Username:</label>
-    <input type="text" id="username" name="username" required>
-
-    <label for="password">Password:</label>
-    <input type="password" id="password" name="password" required>
-
-    <button type="submit">Log In</button>
+<form method="POST" action="{{ url_for('main.login') }}">
+    {{ form.hidden_tag() }}
+    <p>{{ form.email.label }}<br>{{ form.email(size=32) }}</p>
+    <p>{{ form.password.label }}<br>{{ form.password(size=32) }}</p>
+    <p>{{ form.submit() }}</p>
 </form>
 {% endblock %}
