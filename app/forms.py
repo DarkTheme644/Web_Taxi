@@ -13,3 +13,8 @@ class LoginForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])
     submit = SubmitField('Login')
+
+class RideForm(FlaskForm):
+    pickup_location = StringField('Pickup Location', validators=[DataRequired()])
+    dropoff_location = StringField('Dropoff Location', validators=[DataRequired()])
+    submit = SubmitField('Book Ride')

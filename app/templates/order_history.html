@@ -4,5 +4,14 @@
 
 {% block content %}
 <h2>Your Order History</h2>
-<p>List of your previous rides will appear here.</p>
+
+{% if rides %}
+    <ul>
+    {% for ride in rides %}
+        <li>{{ ride.pickup_location }} to {{ ride.dropoff_location }} on {{ ride.date.strftime('%Y-%m-%d %H:%M:%S') }}</li>
+    {% endfor %}
+    </ul>
+{% else %}
+    <p>No rides found.</p>
+{% endif %}
 {% endblock %}

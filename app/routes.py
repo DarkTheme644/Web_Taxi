@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, url_for, flash, redirect
 from .forms import RegistrationForm, LoginForm
-from .models import User
+from .models import User, Ride
 from . import db, bcrypt
+
 
 main = Blueprint('main', __name__)
 
@@ -35,4 +36,22 @@ def login():
 
 @main.route('/order_history')
 def order_history():
-    return render_template('order_history.html')
+    rides = Ride.query.filter_by(user_id=1).all()  # Заменим user_id на текущего пользователя в будущем
+    return render_template('order_history.html', rides=rides)
+
+
+@main.route('/book_ride', methods=['GET', 'POST'])
+def book_ride():
+    form = RideForm()
+    if form.validate_on_submit():
+        ride = Ride(
+            pickup_location=form.pickup_location.data,
+            dropoff_location=form.dropoff_location.data,
+            date=datetime.utcnow(),
+            user_id=1  # Для простоты, пока что ставим user_id = 1 (в будущем заменим на текущего пользователя)
+        )
+        db.session.add(ride)
+        db.session.commit()
+        flash('Your ride has been booked!', 'success')
+        return redirect(url_for('main.order_history'))
+    return render_template('book_ride.html', form=form)
