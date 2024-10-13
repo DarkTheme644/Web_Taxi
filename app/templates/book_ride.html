@@ -1,19 +1,347 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Заказать поездку</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+        }
 
-{% block title %}Book a Ride{% endblock %}
+        header {
+            background-color: #FFC107;
+            padding: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            text-align: center;
+        }
 
-{% block content %}
-<h2>Book a Ride</h2>
-<form method="POST" action="{{ url_for('main.book_ride') }}">
-    {{ form.hidden_tag() }}
-    <p>
-        {{ form.pickup_location.label }}<br>
-        {{ form.pickup_location(size=32) }}
-    </p>
-    <p>
-        {{ form.dropoff_location.label }}<br>
-        {{ form.dropoff_location(size=32) }}
-    </p>
-    <p>{{ form.submit() }}</p>
-</form>
-{% endblock %}
+        nav {
+            background-color: #FFC107;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            font-size: 18px;
+        }
+
+        nav a {
+            color: #333;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        nav a:hover {
+            text-decoration: underline;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            background-color: #f0f0f0;
+            position: relative;
+        }
+
+        #controls {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 1px 4px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            width: 400px;
+            position: absolute;
+            top: 90px;
+        }
+
+        input, select {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            width: 100%;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 5px;
+            border: none;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+
+        #location-btn {
+            background-color: #007BFF;
+        }
+
+        .suggestions {
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            position: absolute;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 2;
+            width: 440px;
+            margin-top: 460px;
+            left: calc(50% - 220px);
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .suggestion-item {
+            padding: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .suggestion-item:hover {
+            background-color: #f7f7f7;
+        }
+
+        .suggestion-item .distance {
+            font-size: 12px;
+            color: #888;
+        }
+
+        #map {
+            width: 100%;
+            height: calc(100% - 100px); /* Оставляет место для шапки и футера */
+            border: 7px solid black; /* Белая рамка вокруг карты */
+            box-sizing: border-box; /* Учитывает рамку в общей ширине и высоте */
+        }
+
+        footer {
+            text-align: center;
+            padding: 10px;
+            background-color: #333;
+            color: #fff;
+            font-size: 14px;
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>Служба Такси</div>
+        <nav>
+            <a href="/">Главная</a>
+            <a href="/order_history">История заказов</a>
+            <a href="/book_ride">Заказать поездку</a>
+            <a href="/logout">Выйти</a>
+        </nav>
+    </header>
+
+    <div class="main-content">
+        <div id="controls">
+            <input id="start" type="text" placeholder="Место отправления" oninput="fetchSuggestions('start')">
+            <div id="start-suggestions" class="suggestions"></div>
+
+            <input id="end" type="text" placeholder="Место назначения" oninput="fetchSuggestions('end')">
+            <div id="end-suggestions" class="suggestions"></div>
+
+            <select id="tariff">
+                <option value="economy">Эконом</option>
+                <option value="comfort">Комфорт</option>
+                <option value="business">Бизнес</option>
+            </select>
+
+            <div class="trip-info">
+                <p>Расстояние: <span id="distance">-</span></p>
+                <p>Оценочное время: <span id="time">-</span></p>
+                <p>Оценочная стоимость: <span id="cost">-</span></p>
+            </div>
+
+            <button onclick="calculateRoute()">Рассчитать маршрут</button>
+            <button id="location-btn" onclick="promptUseMyLocation()">Мое местоположение</button>
+            <button onclick="orderTaxi()">Заказать такси</button>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <footer>
+        &copy; 2024 Служба Такси
+    </footer>
+
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=ee0ab4fb-8d29-4d21-8e80-01d038418647&lang=ru_RU" type="text/javascript"></script>
+    <script type="text/javascript">
+        ymaps.ready(init);
+        var myMap, myLocationMarker;
+        var startCoords, endCoords;
+        var userCoords = null;
+
+        function init() {
+            myMap = new ymaps.Map("map", {
+                center: [55.751244, 37.618423], // Москва по умолчанию
+                zoom: 10
+            });
+        }
+
+        function fetchSuggestions(inputId) {
+            const query = document.getElementById(inputId).value;
+            const suggestionsDiv = document.getElementById(`${inputId}-suggestions`);
+            if (query.length < 3) {
+                suggestionsDiv.innerHTML = '';
+                return;
+            }
+
+            let requestUrl = `https://geocode-maps.yandex.ru/1.x/?apikey=ee0ab4fb-8d29-4d21-8e80-01d038418647&format=json&geocode=${query}`;
+            if (userCoords) {
+                requestUrl += `&ll=${userCoords.join(',')}`;
+            }
+
+            fetch(requestUrl)
+                .then(response => response.json())
+                .then(data => {
+                    const suggestions = data.response.GeoObjectCollection.featureMember;
+                    suggestionsDiv.innerHTML = '';
+
+                    suggestions.forEach(item => {
+                        const address = item.GeoObject.metaDataProperty.GeocoderMetaData.text;
+                        const coords = item.GeoObject.Point.pos.split(" ").reverse().map(Number);
+
+                        const suggestionItem = document.createElement("div");
+                        suggestionItem.className = 'suggestion-item';
+                        suggestionItem.innerHTML = `<span>${address}</span><span class="distance">${Math.floor(Math.random() * 1000)} км</span>`;
+                        suggestionItem.onclick = function() {
+                            document.getElementById(inputId).value = address;
+                            suggestionsDiv.innerHTML = '';
+                            if (inputId === 'start') {
+                                startCoords = coords;
+                            } else {
+                                endCoords = coords;
+                            }
+                        };
+                        suggestionsDiv.appendChild(suggestionItem);
+                    });
+                })
+                .catch(error => console.error("Ошибка при получении предложений:", error));
+        }
+
+        function calculateRoute() {
+            if (!startCoords || !endCoords) {
+                alert("Пожалуйста, выберите и место отправления, и место назначения из предложений.");
+                return;
+            }
+
+            if (myMap.geoObjects.getLength() > 0) {
+                myMap.geoObjects.removeAll();
+            }
+
+            var route = new ymaps.multiRouter.MultiRoute({
+                referencePoints: [
+                    startCoords,
+                    endCoords
+                ],
+                params: {
+                    routingMode: 'auto'
+                }
+            }, {
+                boundsAutoApply: true
+            });
+
+            route.model.events.add("requestsuccess", function() {
+                const routeInfo = route.getActiveRoute();
+                const distance = routeInfo.properties.get("distance").text;
+                const time = routeInfo.properties.get("duration").text;
+
+                const tariff = document.getElementById("tariff").value;
+                const costPerKm = 15;
+                let coefficient;
+
+                switch (tariff) {
+                    case "economy": coefficient = 1; break;
+                    case "comfort": coefficient = 2; break;
+                    case "business": coefficient = 3; break;
+                    default: coefficient = 1;
+                }
+
+                const distanceValue = routeInfo.properties.get("distance").value / 1000; // в км
+                const cost = 150 + (distanceValue * costPerKm * coefficient);
+
+                document.getElementById("distance").innerText = distance;
+                document.getElementById("time").innerText = time;
+                document.getElementById("cost").innerText = `${Math.max(150, Math.round(cost))} руб.`;
+            });
+
+            myMap.geoObjects.add(route);
+        }
+
+        function promptUseMyLocation() {
+            if (confirm("Вы хотите установить ваше текущее местоположение как точку отправления?")) {
+                showMyLocation();
+            }
+        }
+
+        function showMyLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    userCoords = [position.coords.longitude, position.coords.latitude];
+                    startCoords = [position.coords.latitude, position.coords.longitude];
+
+                    ymaps.geocode(startCoords).then(function (res) {
+                        const address = res.geoObjects.get(0) ? res.geoObjects.get(0).getAddressLine() : "Неизвестное место";
+                        document.getElementById("start").value = address;
+                    });
+                }, function(error) {
+                    alert("Не удалось получить ваше местоположение. Включите службы геолокации.");
+                });
+            } else {
+                alert("Геолокация не поддерживается вашим браузером.");
+            }
+        }
+
+        function orderTaxi() {
+            if (!startCoords || !endCoords) {
+                alert("Пожалуйста, выберите и место отправления, и место назначения перед заказом.");
+                return;
+            }
+
+            const tariff = document.getElementById("tariff").value;
+            const distance = document.getElementById("distance").innerText;
+            const time = document.getElementById("time").innerText;
+            const cost = document.getElementById("cost").innerText;
+
+            fetch('/order_taxi', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    start_location: document.getElementById("start").value,
+                    end_location: document.getElementById("end").value,
+                    tariff: tariff,
+                    distance: distance,
+                    time: time,
+                    cost: cost
+                })
+            }).then(response => response.json())
+              .then(data => {
+                  if (data.success) {
+                      alert("Такси успешно заказано!");
+                  } else {
+                      alert("Ошибка при заказе такси.");
+                  }
+              })
+              .catch(error => console.error("Ошибка:", error));
+        }
+    </script>
+</body>
+</html>
