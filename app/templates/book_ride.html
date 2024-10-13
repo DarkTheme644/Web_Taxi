@@ -1,19 +1,251 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Book a Ride</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            font-family: Arial, sans-serif;
+        }
 
-{% block title %}Book a Ride{% endblock %}
+        header {
+            background-color: #FFC107;
+            padding: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            color: #333;
+        }
 
-{% block content %}
-<h2>Book a Ride</h2>
-<form method="POST" action="{{ url_for('main.book_ride') }}">
-    {{ form.hidden_tag() }}
-    <p>
-        {{ form.pickup_location.label }}<br>
-        {{ form.pickup_location(size=32) }}
-    </p>
-    <p>
-        {{ form.dropoff_location.label }}<br>
-        {{ form.dropoff_location(size=32) }}
-    </p>
-    <p>{{ form.submit() }}</p>
-</form>
-{% endblock %}
+        .main-content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            background-color: #f0f0f0;
+            padding-top: 20px;
+        }
+
+        #controls {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            width: 400px;
+        }
+
+        input {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            width: 100%;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 5px;
+            border: none;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+
+        #location-btn {
+            background-color: #007BFF;
+        }
+
+        .suggestions {
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            position: absolute;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 2;
+            width: 440px; /* Установим ширину в соответствие с красной зоной */
+            margin-top: 220px; /* Поднимем список вверх, чтобы он попал в красную зону */
+            left: calc(50% - 220px); /* Отцентрируем список, сместив его влево на половину ширины */
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .suggestion-item {
+            padding: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .suggestion-item:hover {
+            background-color: #f7f7f7;
+        }
+
+        .suggestion-item .distance {
+            font-size: 12px;
+            color: #888;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 0;
+        }
+
+        footer {
+            text-align: center;
+            padding: 10px;
+            background-color: #333;
+            color: #fff;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        Taxi Service
+    </header>
+
+    <div class="main-content">
+        <div id="controls">
+            <input id="start" type="text" placeholder="Starting location" oninput="fetchSuggestions('start')">
+            <div id="start-suggestions" class="suggestions"></div>
+
+            <input id="end" type="text" placeholder="Destination" oninput="fetchSuggestions('end')">
+            <div id="end-suggestions" class="suggestions"></div>
+
+            <button onclick="calculateRoute()">Calculate Route</button>
+            <button id="location-btn" onclick="promptUseMyLocation()">Use My Location</button>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <footer>
+        &copy; 2024 Taxi Service
+    </footer>
+
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=ee0ab4fb-8d29-4d21-8e80-01d038418647&lang=ru_RU" type="text/javascript"></script>
+    <script type="text/javascript">
+        ymaps.ready(init);
+        var myMap, myLocationMarker;
+        var startCoords, endCoords;
+        var userCoords = null;
+
+        function init() {
+            myMap = new ymaps.Map("map", {
+                center: [55.751244, 37.618423], // Москва по умолчанию
+                zoom: 10
+            });
+        }
+
+        function fetchSuggestions(inputId) {
+            const query = document.getElementById(inputId).value;
+            const suggestionsDiv = document.getElementById(`${inputId}-suggestions`);
+            if (query.length < 3) {
+                suggestionsDiv.innerHTML = '';
+                return;
+            }
+
+            let requestUrl = `https://geocode-maps.yandex.ru/1.x/?apikey=ee0ab4fb-8d29-4d21-8e80-01d038418647&format=json&geocode=${query}`;
+            if (userCoords) {
+                requestUrl += `&ll=${userCoords.join(',')}`;
+            }
+
+            fetch(requestUrl)
+                .then(response => response.json())
+                .then(data => {
+                    const suggestions = data.response.GeoObjectCollection.featureMember;
+                    suggestionsDiv.innerHTML = '';
+
+                    suggestions.forEach(item => {
+                        const address = item.GeoObject.metaDataProperty.GeocoderMetaData.text;
+                        const coords = item.GeoObject.Point.pos.split(" ").reverse().map(Number);
+
+                        const suggestionItem = document.createElement("div");
+                        suggestionItem.className = 'suggestion-item';
+                        suggestionItem.innerHTML = `<span>${address}</span><span class="distance">${Math.floor(Math.random() * 1000)} км</span>`;
+                        suggestionItem.onclick = function() {
+                            document.getElementById(inputId).value = address;
+                            suggestionsDiv.innerHTML = '';
+                            if (inputId === 'start') {
+                                startCoords = coords;
+                            } else {
+                                endCoords = coords;
+                            }
+                            console.log(`${inputId} coordinates:`, coords);
+                        };
+                        suggestionsDiv.appendChild(suggestionItem);
+                    });
+                })
+                .catch(error => console.error("Error fetching suggestions:", error));
+        }
+
+        function calculateRoute() {
+            if (!startCoords || !endCoords) {
+                alert("Please select both starting location and destination from the suggestions.");
+                return;
+            }
+
+            if (myMap.geoObjects.getLength() > 0) {
+                myMap.geoObjects.removeAll();
+            }
+
+            var route = new ymaps.multiRouter.MultiRoute({
+                referencePoints: [
+                    startCoords,
+                    endCoords
+                ],
+                params: {
+                    routingMode: 'auto'
+                }
+            }, {
+                boundsAutoApply: true
+            });
+
+            myMap.geoObjects.add(route);
+        }
+
+        function promptUseMyLocation() {
+            if (confirm("Do you want to set your current location as the starting point?")) {
+                showMyLocation();
+            }
+        }
+
+        function showMyLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    userCoords = [position.coords.longitude, position.coords.latitude];
+                    startCoords = [position.coords.latitude, position.coords.longitude];
+
+                    ymaps.geocode(startCoords).then(function (res) {
+                        const address = res.geoObjects.get(0) ? res.geoObjects.get(0).getAddressLine() : "Unknown location";
+                        document.getElementById("start").value = address;
+                        console.log("User's current location:", startCoords);
+                    });
+                }, function(error) {
+                    alert("Unable to retrieve your location. Please enable location services.");
+                });
+            } else {
+                alert("Geolocation is not supported by this browser.");
+            }
+        }
+    </script>
+</body>
+</html>
