@@ -1,8 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Home{% endblock %}
+{% block title %}Главная{% endblock %}
 
 {% block content %}
-<h2>Welcome to the Taxi Service</h2>
-<p>Book a ride and travel conveniently.</p>
+<h2>Добро пожаловать в Службу Такси</h2>
+<p><a href="{{ url_for('main.book_ride') }}">Заказать поездку</a> или <a href="{{ url_for('main.order_history') }}">Посмотреть историю заказов</a></p>
+
+{% if current_user.is_authenticated %}
+    <p>Привет, {{ current_user.username }}!</p>
+    <p><a href="{{ url_for('main.logout') }}">Выйти</a></p>
+{% else %}
+    <p><a href="{{ url_for('main.login') }}">Войти</a> или <a href="{{ url_for('main.register') }}">Зарегистрироваться</a></p>
+{% endif %}
 {% endblock %}

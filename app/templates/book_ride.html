@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Book a Ride</title>
+    <title>Заказать поездку</title>
     <style>
         html, body {
             height: 100%;
@@ -65,7 +65,7 @@
             top: 90px;
         }
 
-        input {
+        input, select {
             padding: 10px;
             border-radius: 5px;
             border: 1px solid #ccc;
@@ -97,7 +97,7 @@
             overflow-y: auto;
             z-index: 2;
             width: 440px;
-            margin-top: 220px;
+            margin-top: 460px;
             left: calc(50% - 220px);
             box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
         }
@@ -120,13 +120,12 @@
             color: #888;
         }
 
-       #map {
+        #map {
             width: 100%;
             height: calc(100% - 100px); /* Оставляет место для шапки и футера */
             border: 7px solid black; /* Белая рамка вокруг карты */
             box-sizing: border-box; /* Учитывает рамку в общей ширине и высоте */
         }
-
 
         footer {
             text-align: center;
@@ -140,32 +139,45 @@
 </head>
 <body>
     <header>
-        <div>Taxi Service</div>
+        <div>Служба Такси</div>
         <nav>
-            <a href="/">Home</a>
-            <a href="/order_history">Order History</a>
-            <a href="/book_ride">Book Ride</a>
-            <a href="/logout">Logout</a>
+            <a href="/">Главная</a>
+            <a href="/order_history">История заказов</a>
+            <a href="/book_ride">Заказать поездку</a>
+            <a href="/logout">Выйти</a>
         </nav>
     </header>
 
     <div class="main-content">
         <div id="controls">
-            <input id="start" type="text" placeholder="Starting location" oninput="fetchSuggestions('start')">
+            <input id="start" type="text" placeholder="Место отправления" oninput="fetchSuggestions('start')">
             <div id="start-suggestions" class="suggestions"></div>
 
-            <input id="end" type="text" placeholder="Destination" oninput="fetchSuggestions('end')">
+            <input id="end" type="text" placeholder="Место назначения" oninput="fetchSuggestions('end')">
             <div id="end-suggestions" class="suggestions"></div>
 
-            <button onclick="calculateRoute()">Calculate Route</button>
-            <button id="location-btn" onclick="promptUseMyLocation()">Use My Location</button>
+            <select id="tariff">
+                <option value="economy">Эконом</option>
+                <option value="comfort">Комфорт</option>
+                <option value="business">Бизнес</option>
+            </select>
+
+            <div class="trip-info">
+                <p>Расстояние: <span id="distance">-</span></p>
+                <p>Оценочное время: <span id="time">-</span></p>
+                <p>Оценочная стоимость: <span id="cost">-</span></p>
+            </div>
+
+            <button onclick="calculateRoute()">Рассчитать маршрут</button>
+            <button id="location-btn" onclick="promptUseMyLocation()">Мое местоположение</button>
+            <button onclick="orderTaxi()">Заказать такси</button>
         </div>
     </div>
 
     <div id="map"></div>
 
     <footer>
-        &copy; 2024 Taxi Service
+        &copy; 2024 Служба Такси
     </footer>
 
     <script src="https://api-maps.yandex.ru/2.1/?apikey=ee0ab4fb-8d29-4d21-8e80-01d038418647&lang=ru_RU" type="text/javascript"></script>
@@ -216,17 +228,16 @@
                             } else {
                                 endCoords = coords;
                             }
-                            console.log(`${inputId} coordinates:`, coords);
                         };
                         suggestionsDiv.appendChild(suggestionItem);
                     });
                 })
-                .catch(error => console.error("Error fetching suggestions:", error));
+                .catch(error => console.error("Ошибка при получении предложений:", error));
         }
 
         function calculateRoute() {
             if (!startCoords || !endCoords) {
-                alert("Please select both starting location and destination from the suggestions.");
+                alert("Пожалуйста, выберите и место отправления, и место назначения из предложений.");
                 return;
             }
 
@@ -246,11 +257,35 @@
                 boundsAutoApply: true
             });
 
+            route.model.events.add("requestsuccess", function() {
+                const routeInfo = route.getActiveRoute();
+                const distance = routeInfo.properties.get("distance").text;
+                const time = routeInfo.properties.get("duration").text;
+
+                const tariff = document.getElementById("tariff").value;
+                const costPerKm = 15;
+                let coefficient;
+
+                switch (tariff) {
+                    case "economy": coefficient = 1; break;
+                    case "comfort": coefficient = 2; break;
+                    case "business": coefficient = 3; break;
+                    default: coefficient = 1;
+                }
+
+                const distanceValue = routeInfo.properties.get("distance").value / 1000; // в км
+                const cost = 150 + (distanceValue * costPerKm * coefficient);
+
+                document.getElementById("distance").innerText = distance;
+                document.getElementById("time").innerText = time;
+                document.getElementById("cost").innerText = `${Math.max(150, Math.round(cost))} руб.`;
+            });
+
             myMap.geoObjects.add(route);
         }
 
         function promptUseMyLocation() {
-            if (confirm("Do you want to set your current location as the starting point?")) {
+            if (confirm("Вы хотите установить ваше текущее местоположение как точку отправления?")) {
                 showMyLocation();
             }
         }
@@ -262,16 +297,50 @@
                     startCoords = [position.coords.latitude, position.coords.longitude];
 
                     ymaps.geocode(startCoords).then(function (res) {
-                        const address = res.geoObjects.get(0) ? res.geoObjects.get(0).getAddressLine() : "Unknown location";
+                        const address = res.geoObjects.get(0) ? res.geoObjects.get(0).getAddressLine() : "Неизвестное место";
                         document.getElementById("start").value = address;
-                        console.log("User's current location:", startCoords);
                     });
                 }, function(error) {
-                    alert("Unable to retrieve your location. Please enable location services.");
+                    alert("Не удалось получить ваше местоположение. Включите службы геолокации.");
                 });
             } else {
-                alert("Geolocation is not supported by this browser.");
+                alert("Геолокация не поддерживается вашим браузером.");
             }
+        }
+
+        function orderTaxi() {
+            if (!startCoords || !endCoords) {
+                alert("Пожалуйста, выберите и место отправления, и место назначения перед заказом.");
+                return;
+            }
+
+            const tariff = document.getElementById("tariff").value;
+            const distance = document.getElementById("distance").innerText;
+            const time = document.getElementById("time").innerText;
+            const cost = document.getElementById("cost").innerText;
+
+            fetch('/order_taxi', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    start_location: document.getElementById("start").value,
+                    end_location: document.getElementById("end").value,
+                    tariff: tariff,
+                    distance: distance,
+                    time: time,
+                    cost: cost
+                })
+            }).then(response => response.json())
+              .then(data => {
+                  if (data.success) {
+                      alert("Такси успешно заказано!");
+                  } else {
+                      alert("Ошибка при заказе такси.");
+                  }
+              })
+              .catch(error => console.error("Ошибка:", error));
         }
     </script>
 </body>

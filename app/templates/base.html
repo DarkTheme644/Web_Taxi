@@ -1,42 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>{% block title %}Taxi Service{% endblock %}</title>
+    <title>{% block title %}Служба Такси{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
     <header>
-        <h1>Taxi Service</h1>
+        <h1>Служба Такси</h1>
         <nav>
-            <a href="{{ url_for('main.home') }}">Home</a>
+            <a href="{{ url_for('main.home') }}">Главная</a>
             {% if current_user.is_authenticated %}
-                <a href="{{ url_for('main.order_history') }}">Order History</a>
-                <a href="{{ url_for('main.book_ride') }}">Book Ride</a>
-                <a href="{{ url_for('main.logout') }}">Logout</a>
+                <a href="{{ url_for('main.order_history') }}">История заказов</a>
+                <a href="{{ url_for('main.book_ride') }}">Заказать поездку</a>
+                <a href="{{ url_for('main.logout') }}">Выйти</a>
             {% else %}
-                <a href="{{ url_for('main.login') }}">Login</a>
-                <a href="{{ url_for('main.register') }}">Register</a>
+                <a href="{{ url_for('main.login') }}">Войти</a>
+                <a href="{{ url_for('main.register') }}">Регистрация</a>
             {% endif %}
         </nav>
     </header>
 
     <main>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <ul>
-                {% for category, message in messages %}
-                    <li class="{{ category }}">{{ message }}</li>
-                {% endfor %}
-                </ul>
-            {% endif %}
-        {% endwith %}
-
         {% block content %}{% endblock %}
     </main>
 
     <footer>
-        <p>&copy; 2024 Taxi Service</p>
+        &copy; 2024 Служба Такси
     </footer>
 </body>
 </html>

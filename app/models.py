@@ -17,6 +17,11 @@ class Ride(db.Model):
     dropoff_location = db.Column(db.String(100), nullable=False)
     date = db.Column(db.DateTime, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    tariff = db.Column(db.String(50), nullable=False)
+    distance = db.Column(db.String(50), nullable=False)
+    time = db.Column(db.String(50), nullable=False)
+    cost = db.Column(db.String(50), nullable=False)
+    status = db.Column(db.String(50), default="Ordered", nullable=False)
 
     def __repr__(self):
-        return f"Ride('{self.pickup_location}', '{self.dropoff_location}', '{self.date}')"
+        return f"Ride('{self.pickup_location}', '{self.dropoff_location}', '{self.date}', '{self.status}')"

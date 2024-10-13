@@ -1,17 +1,32 @@
 {% extends "base.html" %}
 
-{% block title %}Order History{% endblock %}
+{% block title %}История заказов{% endblock %}
 
 {% block content %}
-<h2>Your Order History</h2>
+<h2>История ваших заказов</h2>
 
 {% if rides %}
     <ul>
     {% for ride in rides %}
-        <li>{{ ride.pickup_location }} to {{ ride.dropoff_location }} on {{ ride.date.strftime('%Y-%m-%d %H:%M:%S') }}</li>
+        <li>
+            <strong>Откуда:</strong> {{ ride.pickup_location }}
+            <strong>Куда:</strong> {{ ride.dropoff_location }} <br>
+            <strong>Дата:</strong> {{ ride.date.strftime('%Y-%m-%d %H:%M:%S') }} <br>
+            <strong>Тариф:</strong> {{ ride.tariff }} <br>
+            <strong>Расстояние:</strong> {{ ride.distance }} км <br>
+            <strong>Время:</strong> {{ ride.time }} мин <br>
+            <strong>Стоимость:</strong> {{ ride.cost }} руб. <br>
+            <strong>Статус:</strong> {{ ride.status }} <br>
+            {% if ride.status == 'Ordered' %}
+                <form action="{{ url_for('main.complete_order', ride_id=ride.id) }}" method="post" style="display: inline;">
+                    <button type="submit">Завершить</button>
+                </form>
+            {% endif %}
+        </li>
+        <hr>
     {% endfor %}
     </ul>
 {% else %}
-    <p>No rides found.</p>
+    <p>Заказы не найдены.</p>
 {% endif %}
 {% endblock %}
